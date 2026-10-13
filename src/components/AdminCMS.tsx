@@ -412,7 +412,7 @@ export const AdminCMS: React.FC<{
           </form>
 
           <div className="mt-6 pt-4 border-t border-black/5 dark:border-white/5 text-[11px] text-neutral-400 font-mono">
-            Configured via ADMIN_PASSCODE in .env (default: <span className="font-semibold text-neutral-600 dark:text-neutral-300">shenzun2025</span>)
+            Configured via ADMIN-PSC in ._+ file (default: <span className="font-semibold text-neutral-600 dark:text-neutral-300">shenzun2026</span>)
           </div>
         </div>
       </div>
