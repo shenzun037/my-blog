@@ -66,7 +66,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="p-7 text-white">
           <div className="flex items-center justify-between mb-2">
             <h1 className="font-serif text-2xl tracking-wide font-normal text-white/95">
-              {settings.wordmark || "Shenzun's corner"}
+              {settings.wordmark || "Shenzun's blog"}
             </h1>
             {onCloseMobile && (
               <button
