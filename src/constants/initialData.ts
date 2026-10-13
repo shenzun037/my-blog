@@ -4,7 +4,7 @@ export const INITIAL_SETTINGS: SiteSettings = {
   title: 'SHENZUN',
   subtitleEn: 'A quieter place for a noisier mind.',
   subtitleTh: 'พื้นที่ที่สงบๆ สำหรับใจที่วุ่นวาย',
-  wordmark: "Shenzun's corner",
+  wordmark: "Shenzun's blog",
   kickerEn: 'A JOURNAL OF ORDINARY MAGIC',
   kickerTh: 'บันทึกของความมหัศจรรย์ในวันธรรมดา',
   bioEn: 'I sit quietly in a corner, my mind crowded with countless thoughts. And you know what? I’m afraid that one day, they might find their way out of my head.',

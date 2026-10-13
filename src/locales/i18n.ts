@@ -49,7 +49,7 @@ export const DICTIONARY = {
       languageSwitch: 'Language',
     },
     sidebar: {
-      title: "Shenzun's corner",
+      title: "Shenzun's blog",
       subtitle: 'A quieter place for a noisier mind.',
       quote: 'Same person, different days.',
       musicKicker: 'MUSIC MAKES A SOFTER WORLD',
