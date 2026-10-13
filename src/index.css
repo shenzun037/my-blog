@@ -1,0 +1,161 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-serif: "Cormorant Garamond", Georgia, serif;
+    --font-sans: "Plus Jakarta Sans", "IBM Plex Sans Thai", sans-serif;
+    --font-thai: "IBM Plex Sans Thai", sans-serif;
+    --font-handwriting: "Caveat", cursive;
+
+    /* Semantic Color Tokens (Set dynamically by JournalContext from active ThemeFamily) */
+    --color-page-bg: #f9f6f2;
+    --color-surface: #ffffff;
+    --color-surface-raised: #f3ece2;
+    --color-surface-muted: #e8dcce;
+    --color-text-primary: #251a13;
+    --color-text-secondary: #4e3729;
+    --color-text-muted: #634735;
+    --color-text-inverse: #ffffff;
+    --color-link: #78350f;
+    --color-link-hover: #5e2a0b;
+    --color-accent: #854d0e;
+    --color-accent-hover: #713f12;
+    --color-accent-pressed: #5e2a0b;
+    --color-accent-contrast-text: #ffffff;
+    --color-border: rgba(120, 53, 15, 0.12);
+    --color-border-strong: rgba(120, 53, 15, 0.28);
+    --color-focus-ring: #854d0e;
+    --color-selection-bg: #fef3c7;
+    --color-selection-text: #5e2a0b;
+    --color-overlay: rgba(37, 26, 19, 0.65);
+    --color-input-bg: #ffffff;
+    --color-input-text: #251a13;
+    --color-placeholder: #7c5f4c;
+    --color-success: #15803d;
+    --color-warning: #b45309;
+    --color-error: #b91c1c;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--color-page-bg);
+    color: var(--color-text-primary);
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  ::selection {
+    background-color: var(--color-selection-bg);
+    color: var(--color-selection-text);
+  }
+
+  h1, h2, h3, .font-serif {
+    font-family: var(--font-serif);
+  }
+
+  .font-handwritten {
+    font-family: var(--font-handwriting);
+  }
+
+  /* Accessible focus indicators */
+  :focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+/* Semantic Theme Helper Utility Classes */
+.theme-page-bg {
+  background-color: var(--color-page-bg);
+}
+
+.theme-surface {
+  background-color: var(--color-surface);
+}
+
+.theme-surface-raised {
+  background-color: var(--color-surface-raised);
+}
+
+.theme-surface-muted {
+  background-color: var(--color-surface-muted);
+}
+
+.theme-text-primary {
+  color: var(--color-text-primary);
+}
+
+.theme-text-secondary {
+  color: var(--color-text-secondary);
+}
+
+.theme-text-muted {
+  color: var(--color-text-muted);
+}
+
+.theme-text-inverse {
+  color: var(--color-text-inverse);
+}
+
+.theme-border {
+  border-color: var(--color-border);
+}
+
+.theme-border-strong {
+  border-color: var(--color-border-strong);
+}
+
+.theme-accent {
+  color: var(--color-accent);
+}
+
+.theme-accent-bg {
+  background-color: var(--color-accent);
+  color: var(--color-accent-contrast-text);
+}
+.theme-accent-bg:hover {
+  background-color: var(--color-accent-hover);
+}
+.theme-accent-bg:active {
+  background-color: var(--color-accent-pressed);
+}
+
+.theme-input {
+  background-color: var(--color-input-bg);
+  color: var(--color-input-text);
+  border-color: var(--color-border);
+}
+.theme-input::placeholder {
+  color: var(--color-placeholder);
+}
+
+/* Reduced motion consideration */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Custom scrollbar for subtle aesthetic */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(150, 150, 150, 0.25);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(150, 150, 150, 0.4);
+}
+
+/* Atmospheric subtle film grain effect */
+.film-grain {
+  background-image: radial-gradient(rgba(0,0,0,0.03) 1px, transparent 0);
+  background-size: 24px 24px;
+}

@@ -1,0 +1,6 @@
+{
+  "name": "SHENZUN — Personal Journal & Stories",
+  "description": "An intimate, immersive personal journal and bilingual storytelling sanctuary with real music links from supported platforms.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
