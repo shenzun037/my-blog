@@ -12,6 +12,7 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "test:music": "node --experimental-strip-types --test scripts/test-music-library.ts",
+    "test:upload": "node --experimental-strip-types --test scripts/test-upload-stream.ts",
     "test:contrast": "tsx scripts/test-contrast.ts"
   },
   "dependencies": {

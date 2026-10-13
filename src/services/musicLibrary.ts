@@ -1,7 +1,7 @@
 import type { MusicTrack } from '../types/journal';
 
-export const MAX_MUSIC_UPLOAD_BYTES = 25 * 1024 * 1024;
-export const MAX_MUSIC_ARTWORK_UPLOAD_BYTES = 10 * 1024 * 1024;
+export const MAX_MUSIC_UPLOAD_BYTES = 1 * 1024 * 1024 * 1024;
+export const MAX_MUSIC_ARTWORK_UPLOAD_BYTES = 50 * 1024 * 1024;
 
 const MUSIC_ID_PATTERN = /^music_\d+_[a-f0-9]{8}$/;
 const MUSIC_URL_PATTERN = /^\/uploads\/(music_\d+_[a-f0-9]{8})\.mp3$/;

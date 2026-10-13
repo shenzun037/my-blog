@@ -29,13 +29,6 @@ import { THEMES } from '../constants/themes';
 import { getMusicTitleFromFilename, getMusicTrackLabel, MAX_MUSIC_ARTWORK_UPLOAD_BYTES, MAX_MUSIC_UPLOAD_BYTES } from '../services/musicLibrary';
 import { MusicArtwork } from './MusicArtwork';
 
-const readFileAsDataUrl = (file: File, errorMessage: string): Promise<string> => new Promise((resolve, reject) => {
-  const reader = new FileReader();
-  reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error(errorMessage));
-  reader.onerror = () => reject(new Error(errorMessage));
-  reader.readAsDataURL(file);
-});
-
 export const AdminCMS: React.FC<{
   onClose: () => void;
   onSelectStoryForPreview?: (story: Story) => void;
@@ -186,9 +179,7 @@ export const AdminCMS: React.FC<{
       uploaded = await api.uploadMusic(musicFile);
       if (musicArtworkFile) {
         const artwork = await api.uploadMedia({
-          filename: musicArtworkFile.name,
-          base64Data: await readFileAsDataUrl(musicArtworkFile, t.music.artworkFailed),
-          mimeType: musicArtworkFile.type,
+          file: musicArtworkFile,
           alt: musicTitle.trim() || getMusicTitleFromFilename(musicFile.name),
           caption: musicArtist.trim() || undefined,
         });
@@ -243,9 +234,7 @@ export const AdminCMS: React.FC<{
     let uploadedArtworkUrl: string | null = null;
     try {
       const artwork = await api.uploadMedia({
-        filename: file.name,
-        base64Data: await readFileAsDataUrl(file, t.music.artworkFailed),
-        mimeType: file.type,
+        file,
         alt: getMusicTrackLabel(track),
         caption: track.artist,
       });

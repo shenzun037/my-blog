@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { MusicTrack, Story } from '../src/types/journal.ts';
-import { formatAudioTime, getMusicTitleFromFilename, isLocalArtworkUrl, isLocalMp3Url, isMusicTrack, MAX_MUSIC_UPLOAD_BYTES } from '../src/services/musicLibrary.ts';
+import { formatAudioTime, getMusicTitleFromFilename, isLocalArtworkUrl, isLocalMp3Url, isMusicTrack, MAX_MUSIC_ARTWORK_UPLOAD_BYTES, MAX_MUSIC_UPLOAD_BYTES } from '../src/services/musicLibrary.ts';
 import { resolveStoryMusicSelection } from '../src/services/storyMusicPolicy.ts';
 
 const sampleTrack = (id = 'music_123_abcdef12'): MusicTrack => ({
@@ -36,6 +36,8 @@ test('accepts only canonical first-party MP3 upload paths', () => {
 });
 
 test('validates MP3 metadata without inventing duration or playback values', () => {
+  assert.equal(MAX_MUSIC_UPLOAD_BYTES, 1 * 1024 * 1024 * 1024);
+  assert.equal(MAX_MUSIC_ARTWORK_UPLOAD_BYTES, 50 * 1024 * 1024);
   const track = sampleTrack();
   assert.equal(isMusicTrack(track), true);
   assert.equal('duration' in track, false);

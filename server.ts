@@ -7,8 +7,9 @@ import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import { dbManager } from './server/db.ts';
 import { deliverContactEmail } from './server/email.ts';
+import { streamRequestToFile, UploadRequestError } from './server/uploadStream.ts';
 import { MusicTrack, Story, StorySoundtrack, SiteSettings } from './src/types/journal.ts';
-import { isLocalArtworkUrl, isLocalMp3Url, isMusicTrack, MAX_MUSIC_UPLOAD_BYTES } from './src/services/musicLibrary.ts';
+import { isLocalArtworkUrl, isLocalMp3Url, isMusicTrack, MAX_MUSIC_ARTWORK_UPLOAD_BYTES, MAX_MUSIC_UPLOAD_BYTES } from './src/services/musicLibrary.ts';
 
 dotenv.config();
 
@@ -40,6 +41,14 @@ function normalizeMusicLibrary(value: unknown): { ok: true; value: MusicTrack[] 
   return { ok: true, value: result };
 }
 
+function hasImageSignature(mimeType: string, prefix: Buffer): boolean {
+  if (mimeType === 'image/jpeg') return prefix.length >= 3 && prefix[0] === 0xff && prefix[1] === 0xd8 && prefix[2] === 0xff;
+  if (mimeType === 'image/png') return prefix.length >= 8 && prefix.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  if (mimeType === 'image/webp') return prefix.length >= 12 && prefix.toString('ascii', 0, 4) === 'RIFF' && prefix.toString('ascii', 8, 12) === 'WEBP';
+  if (mimeType === 'image/gif') return prefix.length >= 6 && ['GIF87a', 'GIF89a'].includes(prefix.toString('ascii', 0, 6));
+  return false;
+}
+
 function normalizeStorySoundtrack(value: unknown, library: MusicTrack[]): { ok: true; value: StorySoundtrack | null | undefined } | { ok: false; error: string } {
   if (value === undefined) return { ok: true, value: undefined };
   if (value === null) return { ok: true, value: null };
@@ -64,8 +73,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Base64-encoded 10 MB artwork needs roughly 13.4 MB of JSON payload space.
-app.use(express.json({ limit: '15mb' }));
+app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
 app.use(express.static(PUBLIC_DIR));
 
@@ -367,45 +375,46 @@ app.put('/api/settings', requireAdmin, (req: Request, res: Response) => {
   }
 });
 
-// Admin-only, first-party MP3 uploads. File bytes are stored as static assets; only metadata is kept in SQLite.
-app.post('/api/music/upload', requireAdmin, express.raw({ type: 'audio/mpeg', limit: MAX_MUSIC_UPLOAD_BYTES }), (req: Request, res: Response) => {
+// Admin-only MP3 uploads stream to disk so files near 1 GB do not need to fit in memory.
+app.post('/api/music/upload', requireAdmin, async (req: Request, res: Response) => {
+  if (!req.is('audio/mpeg')) return res.status(415).json({ error: 'Upload an audio/mpeg MP3 file.' });
+  const id = `music_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+  const suppliedName = typeof req.query.filename === 'string' ? req.query.filename : 'audio.mp3';
+  const cleanedName = suppliedName.replace(/[\\/<>:"|?*\x00-\x1f]/g, '_').trim();
+  if (!cleanedName.toLowerCase().endsWith('.mp3')) return res.status(400).json({ error: 'Choose a file with the .mp3 extension.' });
+  const filename = cleanedName.slice(0, 255) || 'audio.mp3';
+  const tempPath = path.join(UPLOADS_DIR, `${id}.mp3.uploading`);
+  const filePath = path.join(UPLOADS_DIR, `${id}.mp3`);
   try {
-    if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
-      return res.status(400).json({ error: 'Choose a valid MP3 file to upload.' });
-    }
-    if (req.body.length > MAX_MUSIC_UPLOAD_BYTES) {
-      return res.status(400).json({ error: 'MP3 files must be 25 MB or smaller.' });
-    }
-    const startsWithId3 = req.body.length >= 3 && req.body.subarray(0, 3).toString('ascii') === 'ID3';
-    const startsWithMpegFrame = req.body.length >= 2 && req.body[0] === 0xff && (req.body[1] & 0xe0) === 0xe0;
+    const { size, prefix } = await streamRequestToFile(req, tempPath, MAX_MUSIC_UPLOAD_BYTES, '1 GB', req.headers['content-length']);
+    const startsWithId3 = prefix.length >= 3 && prefix.subarray(0, 3).toString('ascii') === 'ID3';
+    const startsWithMpegFrame = prefix.length >= 2 && prefix[0] === 0xff && (prefix[1] & 0xe0) === 0xe0;
     if (!startsWithId3 && !startsWithMpegFrame) {
+      await fs.promises.unlink(tempPath).catch(() => undefined);
       return res.status(400).json({ error: 'This file does not look like an MP3. Please choose an .mp3 audio file.' });
     }
 
-    const id = `music_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
-    const suppliedName = typeof req.query.filename === 'string' ? req.query.filename : 'audio.mp3';
-    const cleanedName = suppliedName.replace(/[\\/<>:"|?*\x00-\x1f]/g, '_').trim();
-    if (!cleanedName.toLowerCase().endsWith('.mp3')) return res.status(400).json({ error: 'Choose a file with the .mp3 extension.' });
-    const filename = cleanedName.slice(0, 255) || 'audio.mp3';
+    fs.renameSync(tempPath, filePath);
     const track: MusicTrack = {
       id,
       provider: 'mp3',
       url: `/uploads/${id}.mp3`,
       filename,
       mimeType: 'audio/mpeg',
-      size: req.body.length,
+      size,
       enabled: true,
     };
-    fs.writeFileSync(path.join(UPLOADS_DIR, `${id}.mp3`), req.body, { flag: 'wx' });
     return res.status(201).json(track);
   } catch (err: any) {
-    if (err?.type === 'entity.too.large') return res.status(413).json({ error: 'MP3 files must be 25 MB or smaller.' });
+    await fs.promises.unlink(tempPath).catch(() => undefined);
+    if (err instanceof UploadRequestError) {
+      if (err.status === 413) res.setHeader('Connection', 'close');
+      return res.status(err.status).json({ error: err.message });
+    }
+    if (req.aborted || res.destroyed) return;
     console.error('Music upload failed:', err);
     return res.status(500).json({ error: 'MP3 upload failed. Please try again.' });
   }
-}, (err: any, _req: Request, res: Response, next: NextFunction) => {
-  if (err?.type === 'entity.too.large') return res.status(413).json({ error: 'MP3 files must be 25 MB or smaller.' });
-  return next(err);
 });
 
 app.delete('/api/music/:id', requireAdmin, (req: Request, res: Response) => {
@@ -548,52 +557,47 @@ app.post('/api/messages/:id/retry', requireAdmin, async (req: Request, res: Resp
   }
 });
 
-// 6. MEDIA ASSET UPLOAD
-app.post('/api/media/upload', requireAdmin, (req: Request, res: Response) => {
+// Stream administrator image uploads to disk; the 50 MB cap applies to the binary file itself.
+app.post('/api/media/upload', requireAdmin, async (req: Request, res: Response) => {
+  const mimeType = (req.headers['content-type'] || '').split(';', 1)[0].trim().toLowerCase();
+  const allowedExtensions: Record<string, string> = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'image/gif': 'gif',
+  };
+  const extension = allowedExtensions[mimeType];
+  if (!extension) return res.status(415).json({ error: 'Upload a JPG, PNG, WebP, or GIF image.' });
+
+  const fileId = `media_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+  const safeFilename = `${fileId}.${extension}`;
+  const tempPath = path.join(UPLOADS_DIR, `${fileId}.uploading`);
+  const filePath = path.join(UPLOADS_DIR, safeFilename);
+  let mediaRecordSaved = false;
   try {
-    const { filename, base64Data, mimeType, alt, caption } = req.body;
-    if (!base64Data || !mimeType) {
-      return res.status(400).json({ error: 'base64Data and mimeType are required.' });
+    const { size, prefix } = await streamRequestToFile(req, tempPath, MAX_MUSIC_ARTWORK_UPLOAD_BYTES, '50 MB', req.headers['content-length']);
+    if (!hasImageSignature(mimeType, prefix)) {
+      await fs.promises.unlink(tempPath).catch(() => undefined);
+      return res.status(400).json({ error: 'The file content does not match its declared image type.' });
     }
-
-    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    if (!allowedMimeTypes.includes(mimeType)) {
-      return res.status(400).json({ error: `Unsupported media type: ${mimeType}` });
-    }
-
-    const cleanBase64 = base64Data.replace(/^data:([A-Za-z-+/]+);base64,/, '');
-    const buffer = Buffer.from(cleanBase64, 'base64');
-
-    if (buffer.length > 10 * 1024 * 1024) {
-      return res.status(400).json({ error: 'File size exceeds maximum allowed limit (10MB).' });
-    }
-
-    const ext = mimeType.replace('image/', '');
-    const cleanExt = ext === 'jpeg' ? 'jpg' : ext;
-    const fileId = `media_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
-    const safeFilename = `${fileId}.${cleanExt}`;
-    const filePath = path.join(UPLOADS_DIR, safeFilename);
-
-    fs.writeFileSync(filePath, buffer);
+    fs.renameSync(tempPath, filePath);
     const publicUrl = `/uploads/${safeFilename}`;
+    const suppliedName = typeof req.query.filename === 'string' ? req.query.filename : safeFilename;
+    const filename = suppliedName.replace(/[\\/<>:"|?*\x00-\x1f]/g, '_').trim().slice(0, 255) || safeFilename;
+    const alt = typeof req.query.alt === 'string' ? req.query.alt.slice(0, 500) : undefined;
+    const caption = typeof req.query.caption === 'string' ? req.query.caption.slice(0, 1000) : undefined;
 
-    dbManager.saveMedia({
-      id: fileId,
-      filename: filename || safeFilename,
-      url: publicUrl,
-      mime_type: mimeType,
-      size: buffer.length,
-      alt,
-      caption,
-    });
-
-    return res.status(201).json({
-      success: true,
-      url: publicUrl,
-      filename: safeFilename,
-      size: buffer.length,
-    });
+    dbManager.saveMedia({ id: fileId, filename, url: publicUrl, mime_type: mimeType, size, alt, caption });
+    mediaRecordSaved = true;
+    return res.status(201).json({ success: true, url: publicUrl, filename: safeFilename, size });
   } catch (err: any) {
+    await fs.promises.unlink(tempPath).catch(() => undefined);
+    if (!mediaRecordSaved) await fs.promises.unlink(filePath).catch(() => undefined);
+    if (err instanceof UploadRequestError) {
+      if (err.status === 413) res.setHeader('Connection', 'close');
+      return res.status(err.status).json({ error: err.message });
+    }
+    if (req.aborted || res.destroyed) return;
     console.error('Upload failed:', err);
     return res.status(500).json({ error: 'Media upload failed.' });
   }
@@ -661,9 +665,11 @@ async function startServer() {
     });
   }
 
-  app.listen(Number(PORT), '0.0.0.0', () => {
+  const server = app.listen(Number(PORT), '0.0.0.0', () => {
     console.log(`[SHENZUN] Server online at http://0.0.0.0:${PORT} (Node env: ${process.env.NODE_ENV || 'development'})`);
   });
+  // Large uploads on ordinary home connections can take longer than Node's 5-minute default.
+  server.requestTimeout = 6 * 60 * 60 * 1000;
 }
 
 startServer();

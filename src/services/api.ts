@@ -241,16 +241,20 @@ export const api = {
   },
 
   async uploadMedia(data: {
-    filename: string;
-    base64Data: string;
-    mimeType: string;
+    file: File;
     alt?: string;
     caption?: string;
   }): Promise<{ success: boolean; url: string; filename: string }> {
-    const res = await fetch('/api/media/upload', {
+    const token = getStoredToken();
+    const headers: Record<string, string> = { 'Content-Type': data.file.type };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const params = new URLSearchParams({ filename: data.file.name });
+    if (data.alt) params.set('alt', data.alt);
+    if (data.caption) params.set('caption', data.caption);
+    const res = await fetch(`/api/media/upload?${params.toString()}`, {
       method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data),
+      headers,
+      body: data.file,
     });
     const result = await res.json();
     if (!res.ok) throw new Error(result.error || 'Upload failed');
